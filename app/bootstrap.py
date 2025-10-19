@@ -1,13 +1,12 @@
 import psycopg
+from pgvector.psycopg import register_vector
 import requests
 import sys
 import json
 
 
 EMBED_PULL = "http://localhost:11434/api/pull"
-
 OLLAMA_URL = "http://localhost:11434"
-
 EMBED_MODEL = "nomic-embed-text"
 
 class OllamaUnavailable(Exception):
@@ -41,24 +40,26 @@ def pull_embed_model():
 def vector_creation():
 
     with psycopg.connect("postgresql://localhost/notes") as conn:
-
-        with conn.cusor() as cur:
+        register_vector(conn)
+        with conn.cursor() as cur:
 
             cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
             cur.execute("""
-                        CREATE TABLE notes IF NOTE EXISTS (
-                            document_id PRIMARY KEY,
+                        CREATE TABLE IF NOT EXISTS notes(
+                            document_id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                            title TEXT,
                             content TEXT,
-                            embeding VECTOR(2000)
-
-                        )""")
+                            embedding VECTOR(768)
+                        );""")
+        conn.commit()
 
 
 if __name__ == "__main__":
     try:
         test_ollama_running()
         pull_embed_model()
+        vector_creation()
     except OllamaUnavailable as e:
         print(str(e))
         sys.exit(1)
